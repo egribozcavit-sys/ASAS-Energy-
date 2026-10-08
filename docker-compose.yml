@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/API/Dockerfile
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=db;Database=ASASEnergyDb;Username=postgres;Password=postgres
+    depends_on:
+      - db
+    networks:
+      - asas-network
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=ASASEnergyDb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - asas-network
+
+volumes:
+  postgres_data:
+
+networks:
+  asas-network:
+    driver: bridge
