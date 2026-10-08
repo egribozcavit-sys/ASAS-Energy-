@@ -1,0 +1,688 @@
+// ============================================================
+// A.S.A.S. ENERGY - COMPLETE ARCHITECTURE
+// All layers - Copy and paste to respective files
+// ============================================================
+
+// ============================================================
+// DOMAIN LAYER
+// ============================================================
+
+// src/Domain/Entities/BaseEntity.cs
+using System;
+namespace Domain.Entities;
+public abstract class BaseEntity
+{
+    public Guid Id { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+    protected BaseEntity() { Id = Guid.NewGuid(); CreatedAt = DateTime.UtcNow; IsDeleted = false; }
+    public void UpdateTimestamp() { UpdatedAt = DateTime.UtcNow; }
+    public void SoftDelete() { IsDeleted = true; UpdateTimestamp(); }
+}
+
+// src/Domain/Entities/Enums.cs
+namespace Domain.Entities;
+public enum DeviceStatus { Online = 0, Offline = 1, Standby = 2, Error = 3 }
+public enum AlertSeverity { Low = 0, Medium = 1, High = 2, Critical = 3 }
+public enum AlertType { WasteDetection = 0, DeviceOffline = 1, LowBattery = 2, HighConsumption = 3, SystemError = 4, Maintenance = 5 }
+
+// src/Domain/Entities/SolarPanel.cs
+using System;
+namespace Domain.Entities;
+public class SolarPanel : BaseEntity
+{
+    public string PanelId { get; set; }
+    public string SerialNumber { get; set; }
+    public string Model { get; set; }
+    public string Manufacturer { get; set; }
+    public decimal RatedPower { get; set; }
+    public decimal? CurrentPower { get; set; }
+    public decimal? Efficiency { get; set; }
+    public string? Location { get; set; }
+    public decimal? TotalEnergyProduced { get; set; }
+    public decimal? Temperature { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    public DeviceStatus Status { get; set; }
+    public SolarPanel(string panelId, string serialNumber, string model, string manufacturer, decimal ratedPower)
+    { PanelId = panelId; SerialNumber = serialNumber; Model = model; Manufacturer = manufacturer; RatedPower = ratedPower; Status = DeviceStatus.Offline; }
+    public void UpdatePower(decimal currentPower) { CurrentPower = currentPower; LastSeenAt = DateTime.UtcNow; Status = currentPower > 0 ? DeviceStatus.Online : DeviceStatus.Offline; }
+    public decimal CalculateEfficiency() { if (RatedPower <= 0 || CurrentPower == null) return 0; return (CurrentPower.Value / RatedPower) * 100; }
+    public void AddEnergyProduction(decimal energy) { TotalEnergyProduced = (TotalEnergyProduced ?? 0) + energy; }
+}
+
+// src/Domain/Entities/Inverter.cs
+using System;
+namespace Domain.Entities;
+public class Inverter : BaseEntity
+{
+    public string InverterId { get; set; }
+    public string SerialNumber { get; set; }
+    public string Model { get; set; }
+    public string Manufacturer { get; set; }
+    public decimal RatedPower { get; set; }
+    public decimal? CurrentPower { get; set; }
+    public decimal? Efficiency { get; set; }
+    public decimal? InputVoltage { get; set; }
+    public decimal? OutputVoltage { get; set; }
+    public decimal? InputCurrent { get; set; }
+    public decimal? OutputCurrent { get; set; }
+    public string? ErrorMessage { get; set; }
+    public decimal? TotalEnergyProduced { get; set; }
+    public decimal? Temperature { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    public DeviceStatus Status { get; set; }
+    public Inverter(string inverterId, string serialNumber, string model, string manufacturer, decimal ratedPower)
+    { InverterId = inverterId; SerialNumber = serialNumber; Model = model; Manufacturer = manufacturer; RatedPower = ratedPower; Status = DeviceStatus.Offline; }
+    public void UpdateReadings(decimal currentPower, decimal inputVoltage, decimal outputVoltage, decimal inputCurrent, decimal outputCurrent)
+    { CurrentPower = currentPower; InputVoltage = inputVoltage; OutputVoltage = outputVoltage; InputCurrent = inputCurrent; OutputCurrent = outputCurrent; LastSeenAt = DateTime.UtcNow; Status = currentPower > 0 ? DeviceStatus.Online : DeviceStatus.Offline; }
+    public void SetError(string errorMessage) { ErrorMessage = errorMessage; Status = DeviceStatus.Error; }
+    public void ClearError() { ErrorMessage = null; Status = DeviceStatus.Online; }
+}
+
+// src/Domain/Entities/Battery.cs
+using System;
+namespace Domain.Entities;
+public class Battery : BaseEntity
+{
+    public string BatteryId { get; set; }
+    public string SerialNumber { get; set; }
+    public string Model { get; set; }
+    public string Manufacturer { get; set; }
+    public decimal Capacity { get; set; }
+    public decimal? CurrentCharge { get; set; }
+    public decimal? ChargePercent { get; set; }
+    public decimal? Voltage { get; set; }
+    public decimal? Current { get; set; }
+    public decimal? Temperature { get; set; }
+    public decimal? HealthPercent { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    public DeviceStatus Status { get; set; }
+    public Battery(string batteryId, string serialNumber, string model, string manufacturer, decimal capacity)
+    { BatteryId = batteryId; SerialNumber = serialNumber; Model = model; Manufacturer = manufacturer; Capacity = capacity; Status = DeviceStatus.Offline; }
+    public void UpdateCharge(decimal currentCharge, decimal voltage, decimal current)
+    { CurrentCharge = currentCharge; Voltage = voltage; Current = current; ChargePercent = (currentCharge / Capacity) * 100; LastSeenAt = DateTime.UtcNow; Status = currentCharge > 0 ? DeviceStatus.Online : DeviceStatus.Offline; }
+    public void Charge(decimal amount) { CurrentCharge = Math.Min(Capacity, (CurrentCharge ?? 0) + amount); ChargePercent = (CurrentCharge / Capacity) * 100; }
+    public void Discharge(decimal amount) { CurrentCharge = Math.Max(0, (CurrentCharge ?? 0) - amount); ChargePercent = (CurrentCharge / Capacity) * 100; }
+    public void UpdateHealth(decimal healthPercent) { HealthPercent = healthPercent; }
+}
+
+// src/Domain/Entities/EnergyMeter.cs
+using System;
+namespace Domain.Entities;
+public class EnergyMeter : BaseEntity
+{
+    public string MeterId { get; set; }
+    public string SerialNumber { get; set; }
+    public string Model { get; set; }
+    public string? IpAddress { get; set; }
+    public decimal? CurrentPower { get; set; }
+    public decimal? Voltage { get; set; }
+    public decimal? Current { get; set; }
+    public decimal? Frequency { get; set; }
+    public decimal? PowerFactor { get; set; }
+    public decimal? TotalEnergyConsumed { get; set; }
+    public decimal? TotalEnergyProduced { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    public EnergyMeter(string meterId, string serialNumber, string model)
+    { MeterId = meterId; SerialNumber = serialNumber; Model = model; }
+    public void UpdateReadings(decimal currentPower, decimal voltage, decimal current, decimal frequency, decimal powerFactor)
+    { CurrentPower = currentPower; Voltage = voltage; Current = current; Frequency = frequency; PowerFactor = powerFactor; LastSeenAt = DateTime.UtcNow; }
+    public void AddEnergyConsumed(decimal energy) { TotalEnergyConsumed = (TotalEnergyConsumed ?? 0) + energy; }
+    public void AddEnergyProduced(decimal energy) { TotalEnergyProduced = (TotalEnergyProduced ?? 0) + energy; }
+}
+
+// src/Domain/Entities/Device.cs
+using System;
+namespace Domain.Entities;
+public class Device : BaseEntity
+{
+    public string DeviceId { get; set; }
+    public string Name { get; set; }
+    public string Type { get; set; }
+    public decimal RatedPower { get; set; }
+    public decimal? CurrentPower { get; set; }
+    public string? IpAddress { get; set; }
+    public string? RelayId { get; set; }
+    public bool IsSmart { get; set; }
+    public decimal? TotalEnergyConsumed { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    public DeviceStatus Status { get; set; }
+    public string? WasteReason { get; set; }
+    public Device(string name, string type, decimal ratedPower)
+    { DeviceId = $"DEV-{Guid.NewGuid()}"; Name = name; Type = type; RatedPower = ratedPower; IsSmart = false; Status = DeviceStatus.Offline; }
+    public void TurnOn() { Status = DeviceStatus.Online; LastSeenAt = DateTime.UtcNow; }
+    public void TurnOff() { Status = DeviceStatus.Offline; LastSeenAt = DateTime.UtcNow; }
+    public void UpdatePower(decimal currentPower) { CurrentPower = currentPower; LastSeenAt = DateTime.UtcNow; }
+    public void MarkAsWasting(string reason) { WasteReason = reason; }
+    public void ClearWaste() { WasteReason = null; }
+}
+
+// src/Domain/Entities/WasteAlert.cs
+using System;
+namespace Domain.Entities;
+public class WasteAlert : BaseEntity
+{
+    public string AlertId { get; set; }
+    public string Title { get; set; }
+    public string Message { get; set; }
+    public AlertSeverity Severity { get; set; }
+    public AlertType Type { get; set; }
+    public bool IsRead { get; set; }
+    public DateTime? AcknowledgedAt { get; set; }
+    public string? Resolution { get; set; }
+    public bool IsResolved { get; set; }
+    public Guid DeviceId { get; set; }
+    public Device? Device { get; set; }
+    public decimal EstimatedWaste { get; set; }
+    public decimal EstimatedCost { get; set; }
+    public WasteAlert(string title, string message, Device device, decimal estimatedWaste, decimal estimatedCost)
+    { AlertId = $"ALT-{Guid.NewGuid()}"; Title = title; Message = message; Device = device; DeviceId = device.Id; EstimatedWaste = estimatedWaste; EstimatedCost = estimatedCost; Severity = AlertSeverity.Medium; Type = AlertType.WasteDetection; IsRead = false; IsResolved = false; CreatedAt = DateTime.UtcNow; }
+    public void Acknowledge() { IsRead = true; AcknowledgedAt = DateTime.UtcNow; }
+    public void Resolve(string resolution) { Resolution = resolution; IsResolved = true; AcknowledgedAt = DateTime.UtcNow; }
+}
+
+// src/Domain/Interfaces/IRepository.cs
+using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Domain.Interfaces;
+public interface IRepository<T> where T : class
+{
+    Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<IEnumerable<T>> GetAllAsync(CancellationToken ct = default);
+    Task<T> AddAsync(T entity, CancellationToken ct = default);
+    Task UpdateAsync(T entity, CancellationToken ct = default);
+    Task DeleteAsync(T entity, CancellationToken ct = default);
+    Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
+    Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
+    Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
+    Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default);
+}
+
+// src/Domain/Interfaces/IEnergyService.cs
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Domain.Interfaces;
+public interface IEnergyService
+{
+    Task<EnergyReadingsResponse> GetCurrentReadingsAsync(Guid userId, CancellationToken ct = default);
+    Task<OptimizationResult> OptimizeEnergyAsync(Guid userId, DateTime from, DateTime to, CancellationToken ct = default);
+    Task<WasteDetectionResult> DetectWasteAsync(Guid userId, CancellationToken ct = default);
+}
+public record EnergyReadingsResponse(decimal? TotalProduction, decimal? TotalConsumption, decimal? GridImport, decimal? GridExport, decimal? BatteryCharge, decimal? SolarProduction, decimal? CurrentPrice, DateTime Timestamp);
+public record OptimizationResult(decimal Savings, decimal CostReduction, decimal EfficiencyGain, List<OptimizationRecommendation> Recommendations, DateTime GeneratedAt);
+public record OptimizationRecommendation(string Type, string Description, decimal EstimatedSavings, TimeSpan ImplementationTime, int Priority);
+public record WasteDetectionResult(decimal TotalWaste, decimal EstimatedCost, int DeviceCount, List<WasteDetectionItem> Devices, DateTime DetectedAt);
+public record WasteDetectionItem(Guid DeviceId, string DeviceName, decimal WastedEnergy, decimal EstimatedCost, string Reason);
+
+// src/Domain/Interfaces/IIoTService.cs
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Domain.Interfaces;
+public interface IIoTService
+{
+    Task ConnectAsync(CancellationToken ct = default);
+    Task DisconnectAsync(CancellationToken ct = default);
+    Task PublishAsync(string topic, string message, CancellationToken ct = default);
+    Task SubscribeAsync(string topic, Func<string, Task> handler, CancellationToken ct = default);
+    bool IsConnected { get; }
+}
+
+// src/Domain/Interfaces/IWeatherService.cs
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Domain.Interfaces;
+public interface IWeatherService
+{
+    Task<WeatherForecast> GetForecastAsync(decimal latitude, decimal longitude, CancellationToken ct = default);
+    Task<WeatherForecast> GetCurrentAsync(decimal latitude, decimal longitude, CancellationToken ct = default);
+}
+public record WeatherForecast(DateTime Date, decimal Temperature, decimal Humidity, decimal WindSpeed, string Condition, decimal? SolarIrradiance);
+
+// ============================================================
+// APPLICATION LAYER
+// ============================================================
+
+// src/Application/DependencyInjection.cs
+using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
+namespace Application;
+public static class DependencyInjection
+{
+    public static IServiceCollection AddApplication(this IServiceCollection services)
+    {
+        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
+        return services;
+    }
+}
+
+// src/Application/Features/Energy/Queries/GetCurrentReadingsQuery.cs
+using MediatR;
+using Domain.Interfaces;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Application.Features.Energy.Queries;
+public record GetCurrentReadingsQuery(Guid UserId) : IRequest<EnergyReadingsResponse>;
+public class GetCurrentReadingsQueryHandler : IRequestHandler<GetCurrentReadingsQuery, EnergyReadingsResponse>
+{
+    private readonly IEnergyService _energyService;
+    public GetCurrentReadingsQueryHandler(IEnergyService energyService) { _energyService = energyService; }
+    public async Task<EnergyReadingsResponse> Handle(GetCurrentReadingsQuery request, CancellationToken ct)
+    {
+        return await _energyService.GetCurrentReadingsAsync(request.UserId, ct);
+    }
+}
+
+// src/Application/Features/Energy/Commands/OptimizeEnergyCommand.cs
+using MediatR;
+using Domain.Interfaces;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Application.Features.Energy.Commands;
+public record OptimizeEnergyCommand(Guid UserId, DateTime From, DateTime To) : IRequest<OptimizationResult>;
+public class OptimizeEnergyCommandHandler : IRequestHandler<OptimizeEnergyCommand, OptimizationResult>
+{
+    private readonly IEnergyService _energyService;
+    public OptimizeEnergyCommandHandler(IEnergyService energyService) { _energyService = energyService; }
+    public async Task<OptimizationResult> Handle(OptimizeEnergyCommand request, CancellationToken ct)
+    {
+        return await _energyService.OptimizeEnergyAsync(request.UserId, request.From, request.To, ct);
+    }
+}
+
+// src/Application/Features/Devices/Commands/CreateDeviceCommand.cs
+using MediatR;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Application.Features.Devices.Commands;
+public record CreateDeviceCommand(string Name, string Type, decimal RatedPower, bool IsSmart = false) : IRequest<DeviceResponse>;
+public record DeviceResponse(Guid Id, string DeviceId, string Name, string Type, decimal RatedPower, bool IsSmart, DeviceStatus Status, DateTime? LastSeenAt);
+public class CreateDeviceCommandHandler : IRequestHandler<CreateDeviceCommand, DeviceResponse>
+{
+    public async Task<DeviceResponse> Handle(CreateDeviceCommand request, CancellationToken ct)
+    {
+        return new DeviceResponse(Guid.NewGuid(), $"DEV-{Guid.NewGuid()}", request.Name, request.Type, request.RatedPower, request.IsSmart, DeviceStatus.Offline, null);
+    }
+}
+
+// src/Application/Features/Devices/Commands/TurnDeviceOnOffCommand.cs
+using MediatR;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Application.Features.Devices.Commands;
+public record TurnDeviceOnOffCommand(Guid DeviceId, bool TurnOn) : IRequest<TurnDeviceResponse>;
+public record TurnDeviceResponse(bool Success, string Message);
+public class TurnDeviceOnOffCommandHandler : IRequestHandler<TurnDeviceOnOffCommand, TurnDeviceResponse>
+{
+    public async Task<TurnDeviceResponse> Handle(TurnDeviceOnOffCommand request, CancellationToken ct)
+    {
+        await Task.Delay(100, ct);
+        return new TurnDeviceResponse(true, $"Device {(request.TurnOn ? "turned ON" : "turned OFF")}");
+    }
+}
+
+// src/Application/Features/Alerts/Commands/AcknowledgeAlertCommand.cs
+using MediatR;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Application.Features.Alerts.Commands;
+public record AcknowledgeAlertCommand(Guid AlertId) : IRequest<AcknowledgeAlertResponse>;
+public record AcknowledgeAlertResponse(bool Success, string Message);
+public class AcknowledgeAlertCommandHandler : IRequestHandler<AcknowledgeAlertCommand, AcknowledgeAlertResponse>
+{
+    public async Task<AcknowledgeAlertResponse> Handle(AcknowledgeAlertCommand request, CancellationToken ct)
+    {
+        await Task.Delay(50, ct);
+        return new AcknowledgeAlertResponse(true, "Alert acknowledged");
+    }
+}
+
+// src/Application/Features/Optimization/Commands/DetectWasteCommand.cs
+using MediatR;
+using Domain.Interfaces;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Application.Features.Optimization.Commands;
+public record DetectWasteCommand(Guid UserId) : IRequest<WasteDetectionResult>;
+public class DetectWasteCommandHandler : IRequestHandler<DetectWasteCommand, WasteDetectionResult>
+{
+    private readonly IEnergyService _energyService;
+    public DetectWasteCommandHandler(IEnergyService energyService) { _energyService = energyService; }
+    public async Task<WasteDetectionResult> Handle(DetectWasteCommand request, CancellationToken ct)
+    {
+        return await _energyService.DetectWasteAsync(request.UserId, ct);
+    }
+}
+
+// ============================================================
+// INFRASTRUCTURE LAYER
+// ============================================================
+
+// src/Infrastructure/DependencyInjection.cs
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Domain.Interfaces;
+using Infrastructure.Services;
+namespace Infrastructure;
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IEnergyService, EnergyService>();
+        services.AddScoped<IIoTService, IoTService>();
+        services.AddScoped<IWeatherService, WeatherService>();
+        return services;
+    }
+}
+
+// src/Infrastructure/Services/EnergyService.cs
+using Domain.Interfaces;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+namespace Infrastructure.Services;
+public class EnergyService : IEnergyService
+{
+    public async Task<EnergyReadingsResponse> GetCurrentReadingsAsync(Guid userId, CancellationToken ct)
+    {
+        await Task.Delay(100, ct);
+        return new EnergyReadingsResponse(5000, 3500, 1000, 500, 2000, 4500, 0.15m, DateTime.UtcNow);
+    }
+    public async Task<OptimizationResult> OptimizeEnergyAsync(Guid userId, DateTime from, DateTime to, CancellationToken ct)
+    {
+        await Task.Delay(200, ct);
+        return new OptimizationResult(150.50m, 120.00m, 15.5m, new List<OptimizationRecommendation>(), DateTime.UtcNow);
+    }
+    public async Task<WasteDetectionResult> DetectWasteAsync(Guid userId, CancellationToken ct)
+    {
+        await Task.Delay(150, ct);
+        return new WasteDetectionResult(250.5m, 37.58m, 3, new List<WasteDetectionItem>(), DateTime.UtcNow);
+    }
+}
+
+// src/Infrastructure/IoT/IoTService.cs
+using Domain.Interfaces;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Infrastructure.IoT;
+public class IoTService : IIoTService
+{
+    public bool IsConnected { get; private set; }
+    public async Task ConnectAsync(CancellationToken ct) { await Task.Delay(100, ct); IsConnected = true; }
+    public async Task DisconnectAsync(CancellationToken ct) { await Task.Delay(50, ct); IsConnected = false; }
+    public async Task PublishAsync(string topic, string message, CancellationToken ct) { await Task.Delay(10, ct); }
+    public async Task SubscribeAsync(string topic, Func<string, Task> handler, CancellationToken ct) { await Task.Delay(10, ct); }
+}
+
+// src/Infrastructure/Services/WeatherService.cs
+using Domain.Interfaces;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+namespace Infrastructure.Services;
+public class WeatherService : IWeatherService
+{
+    public async Task<WeatherForecast> GetForecastAsync(decimal latitude, decimal longitude, CancellationToken ct)
+    {
+        await Task.Delay(100, ct);
+        return new WeatherForecast(DateTime.UtcNow.AddDays(1), 25.5m, 60, 15, "Sunny", 800);
+    }
+    public async Task<WeatherForecast> GetCurrentAsync(decimal latitude, decimal longitude, CancellationToken ct)
+    {
+        await Task.Delay(50, ct);
+        return new WeatherForecast(DateTime.UtcNow, 23.0m, 55, 12, "Clear", 750);
+    }
+}
+
+// ============================================================
+// PERSISTENCE LAYER
+// ============================================================
+
+// src/Persistence/DependencyInjection.cs
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Persistence.DbContext;
+using Domain.Interfaces;
+using Persistence.Repositories;
+namespace Persistence;
+public static class DependencyInjection
+{
+    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContext<EnergyDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+            b => b.MigrationsAssembly(typeof(EnergyDbContext).Assembly.FullName)));
+        services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+        return services;
+    }
+}
+
+// src/Persistence/DbContext/EnergyDbContext.cs
+using Microsoft.EntityFrameworkCore;
+using Domain.Entities;
+using System.Reflection;
+namespace Persistence.DbContext;
+public class EnergyDbContext : Microsoft.EntityFrameworkCore.DbContext
+{
+    public EnergyDbContext(DbContextOptions<EnergyDbContext> options) : base(options) { }
+    public DbSet<SolarPanel> SolarPanels => Set<SolarPanel>();
+    public DbSet<Inverter> Inverters => Set<Inverter>();
+    public DbSet<Battery> Batteries => Set<Battery>();
+    public DbSet<EnergyMeter> EnergyMeters => Set<EnergyMeter>();
+    public DbSet<Device> Devices => Set<Device>();
+    public DbSet<WasteAlert> WasteAlerts => Set<WasteAlert>();
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<SolarPanel>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Inverter>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Battery>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<EnergyMeter>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Device>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<WasteAlert>().HasQueryFilter(e => !e.IsDeleted);
+    }
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = ChangeTracker.Entries<BaseEntity>().Where(e => e.Entity is BaseEntity && (e.State == EntityState.Added || e.State == EntityState.Modified));
+        foreach (var entry in entries)
+        {
+            if (entry.State == EntityState.Added) entry.Entity.CreatedAt = DateTime.UtcNow;
+            else if (entry.State == EntityState.Modified) entry.Entity.UpdateTimestamp();
+        }
+        return base.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// src/Persistence/Repositories/Repository.cs
+using Domain.Interfaces;
+using Persistence.DbContext;
+using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+namespace Persistence.Repositories;
+public class Repository<T> : IRepository<T> where T : class
+{
+    protected readonly EnergyDbContext _context;
+    protected readonly DbSet<T> _dbSet;
+    public Repository(EnergyDbContext context) { _context = context; _dbSet = context.Set<T>(); }
+    public virtual async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default) { return await _dbSet.FindAsync(new object[] { id }, ct); }
+    public virtual async Task<IEnumerable<T>> GetAllAsync(CancellationToken ct = default) { return await _dbSet.ToListAsync(ct); }
+    public virtual async Task<T> AddAsync(T entity, CancellationToken ct = default) { await _dbSet.AddAsync(entity, ct); await _context.SaveChangesAsync(ct); return entity; }
+    public virtual async Task UpdateAsync(T entity, CancellationToken ct = default) { _dbSet.Update(entity); await _context.SaveChangesAsync(ct); }
+    public virtual async Task DeleteAsync(T entity, CancellationToken ct = default) { _dbSet.Remove(entity); await _context.SaveChangesAsync(ct); }
+    public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) { return await _dbSet.Where(predicate).ToListAsync(ct); }
+    public virtual async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) { return await _dbSet.FirstOrDefaultAsync(predicate, ct); }
+    public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) { return await _dbSet.AnyAsync(predicate, ct); }
+    public virtual async Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default) { return predicate == null ? await _dbSet.CountAsync(ct) : await _dbSet.CountAsync(predicate, ct); }
+}
+
+// ============================================================
+// API LAYER
+// ============================================================
+
+// src/API/Program.cs
+using Application;
+using Infrastructure;
+using Persistence;
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddPersistence(builder.Configuration);
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+var app = builder.Build();
+if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
+
+// src/API/Controllers/EnergyController.cs
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MediatR;
+using Application.Features.Energy.Queries;
+using Application.Features.Energy.Commands;
+namespace API.Controllers;
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class EnergyController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public EnergyController(IMediator mediator) { _mediator = mediator; }
+    [HttpGet("current")]
+    [ProducesResponseType(typeof(EnergyReadingsResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<EnergyReadingsResponse>> GetCurrentReadings(CancellationToken ct)
+    {
+        var userId = Guid.NewGuid();
+        var query = new GetCurrentReadingsQuery(userId);
+        var result = await _mediator.Send(query, ct);
+        return Ok(result);
+    }
+    [HttpPost("optimize")]
+    [ProducesResponseType(typeof(OptimizationResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<OptimizationResult>> OptimizeEnergy([FromBody] OptimizeEnergyRequest request, CancellationToken ct)
+    {
+        var userId = Guid.NewGuid();
+        var command = new OptimizeEnergyCommand(userId, request.From, request.To);
+        var result = await _mediator.Send(command, ct);
+        return Ok(result);
+    }
+}
+public record OptimizeEnergyRequest(DateTime From, DateTime To);
+
+// src/API/Controllers/DevicesController.cs
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MediatR;
+using Application.Features.Devices.Commands;
+namespace API.Controllers;
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class DevicesController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public DevicesController(IMediator mediator) { _mediator = mediator; }
+    [HttpPost]
+    [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status201Created)]
+    public async Task<ActionResult<DeviceResponse>> CreateDevice([FromBody] CreateDeviceRequest request, CancellationToken ct)
+    {
+        var command = new CreateDeviceCommand(request.Name, request.Type, request.RatedPower, request.IsSmart ?? false);
+        var result = await _mediator.Send(command, ct);
+        return CreatedAtAction(nameof(GetDevice), new { id = result.Id }, result);
+    }
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<DeviceResponse>> GetDevice(Guid id, CancellationToken ct)
+    {
+        return Ok(new DeviceResponse(id, "device-123", "Sample Device", "AC", 1500, false, DeviceStatus.Online, DateTime.UtcNow));
+    }
+    [HttpPost("{id:guid}/turn-on")]
+    [ProducesResponseType(typeof(TurnDeviceResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TurnDeviceResponse>> TurnOnDevice(Guid id, CancellationToken ct)
+    {
+        var command = new TurnDeviceOnOffCommand(id, true);
+        var result = await _mediator.Send(command, ct);
+        return Ok(result);
+    }
+    [HttpPost("{id:guid}/turn-off")]
+    [ProducesResponseType(typeof(TurnDeviceResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TurnDeviceResponse>> TurnOffDevice(Guid id, CancellationToken ct)
+    {
+        var command = new TurnDeviceOnOffCommand(id, false);
+        var result = await _mediator.Send(command, ct);
+        return Ok(result);
+    }
+}
+public record CreateDeviceRequest(string Name, string Type, decimal RatedPower, bool? IsSmart = null);
+
+// src/API/Controllers/AlertsController.cs
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MediatR;
+using Application.Features.Alerts.Commands;
+namespace API.Controllers;
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class AlertsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public AlertsController(IMediator mediator) { _mediator = mediator; }
+    [HttpGet]
+    [ProducesResponseType(typeof(List<AlertResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<AlertResponse>>> GetAlerts(CancellationToken ct)
+    {
+        return Ok(new List<AlertResponse>());
+    }
+    [HttpPost("{id:guid}/acknowledge")]
+    [ProducesResponseType(typeof(AcknowledgeAlertResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AcknowledgeAlertResponse>> AcknowledgeAlert(Guid id, CancellationToken ct)
+    {
+        var command = new AcknowledgeAlertCommand(id);
+        var result = await _mediator.Send(command, ct);
+        return Ok(result);
+    }
+}
+
+// src/API/Hubs/EnergyHub.cs
+using Microsoft.AspNetCore.SignalR;
+namespace API.Hubs;
+public class EnergyHub : Hub
+{
+    public async Task SubscribeToDevice(string deviceId) { await Groups.AddToGroupAsync(Context.ConnectionId, $"device-{deviceId}"); }
+    public async Task UnsubscribeFromDevice(string deviceId) { await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"device-{deviceId}"); }
+    public async Task SendDeviceReading(string deviceId, object reading) { await Clients.Group($"device-{deviceId}").SendAsync("DeviceReading", deviceId, reading); }
+}
+
+// ============================================================
+// SHARED LAYER
+// ============================================================
+
+// src/Shared/DTOs/DeviceDto.cs
+namespace Shared.DTOs;
+public record DeviceDto(Guid Id, string DeviceId, string Name, string Type, decimal RatedPower, decimal? CurrentPower, DeviceStatus Status, DateTime? LastSeenAt);
+public record SolarPanelDto(Guid Id, string PanelId, string Model, string Manufacturer, decimal RatedPower, decimal? CurrentPower, decimal? Efficiency, decimal? TotalEnergyProduced, DateTime? LastSeenAt);
+public record InverterDto(Guid Id, string InverterId, string Model, string Manufacturer, decimal RatedPower, decimal? CurrentPower, decimal? Efficiency, decimal? InputVoltage, decimal? OutputVoltage, decimal? TotalEnergyProduced, DateTime? LastSeenAt);
+public record BatteryDto(Guid Id, string BatteryId, string Model, string Manufacturer, decimal Capacity, decimal? CurrentCharge, decimal? ChargePercent, decimal? Voltage, decimal? Current, decimal? HealthPercent, DateTime? LastSeenAt);
+public record EnergyMeterDto(Guid Id, string MeterId, string Model, decimal? CurrentPower, decimal? Voltage, decimal? Current, decimal? Frequency, decimal? PowerFactor, decimal? TotalEnergyConsumed, decimal? TotalEnergyProduced, DateTime? LastSeenAt);
+public record AlertDto(Guid Id, string AlertId, string Title, string Message, AlertSeverity Severity, AlertType Type, bool IsRead, DateTime CreatedAt, Guid? DeviceId);
+
+// ============================================================
+// END OF COMPLETE ARCHITECTURE
+// ============================================================
