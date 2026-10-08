@@ -1,0 +1,25 @@
+# ASAS.Energy klasöründe
+cat > .gitignore << 'EOF'
+# Visual Studio
+.vs/
+*.suo
+*.user
+
+# Build results
+bin/
+obj/
+*.dll
+*.exe
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# Test results
+TestResults/
+
+# NuGet
+packages/
+EOF
