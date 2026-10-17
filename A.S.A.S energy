@@ -686,4 +686,4 @@ public record AlertDto(Guid Id, string AlertId, string Title, string Message, Al
 // ============================================================
 // END OF COMPLETE ARCHITECTURE
 // ============================================================
-   
+    
